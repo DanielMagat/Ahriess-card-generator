@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Generator</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        
+        function CardGenerator() {
+          const [cardData, setCardData] = useState({
+            energyCost: '5',
+            cardName: 'Example Card',
+            cardType: 'Spell',
+            rulesText: 'This is an example of rules text that will automatically scale to fit the text box.'
+          });
+          
+          const [cardFrame, setCardFrame] = useState(null);
+          const [cardArt, setCardArt] = useState(null);
+          const [artPosition, setArtPosition] = useState({ x: 0, y: 0, scale: 1 });
+          const [isDragging, setIsDragging] = useState(false);
+          const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+          
+          const [influenceIcons, setInfluenceIcons] = useState({
+            brilliance: null,
+            exotic: null,
+            industry: null,
+            sorcery: null
+          });
+          
+          // Changed to store counts instead of boolean selection
+          const [influenceCounts, setInfluenceCounts] = useState({
+            brilliance: 0,
+            exotic: 0,
+            industry: 0,
+            sorcery: 0
+          });
+          
+          const [imagesLoaded, setImagesLoaded] = useState(false);
+          
+          const canvasRef = useRef(null);
+          const previewCanvasRef = useRef(null);
+          
+          const CARD_WIDTH = 750;
+          const CARD_HEIGHT = 1050;
+          
+          // Adjust these coordinates to match your card frame perfectly
+          const ART_BOX = { x: 55, y: 160, width: 640, height: 480 };
+          const ENERGY_POS = { x: 130, y: 125, size: 70 };
+          const NAME_BOX = { x: 220, y: 95, width: 520, height: 50 };
+          const TYPE_BOX = { x: 342, y: 600, width: 620, height: 40 };
+          const RULES_BOX = { x: 365, y: 670, width: 555, height: 230 };
+          
+          // Icon configuration
+          const ICON_START = { 
+            x: 60,           // X position
+			x2: 135,
+            y: 200,          // Starting Y position
+            width: 75,       // Width to render icons at
+            height: 100,      // Height to render icons at (adjust for your icon proportions)
+            spacing: 100      // Space between icons
+          };
+          
+          // FONT CONFIGURATION - Change these to use different fonts
+          const FONTS = {
+            energy: 'bold 60px Arial',           // Energy cost font
+            name: 'bold 32px Arial',           // Card name font
+            type: '24px Arial',                  // Card type font
+            rules: '22px "Plantin"'      // Rules text font
+          };
+          
+          // Load images on mount
+		  useEffect(() => {
+            const loadImage = (src) => {
+              return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+              });
+            };
+    
+            Promise.all([
+              loadImage('images/frame.png'),
+              loadImage('images/frame-unit.png'),  // Add unit frame
+              loadImage('images/Brilliance.jpg'),
+              loadImage('images/Exotic.jpg'),
+              loadImage('images/Industry.jpg'),
+              loadImage('images/Sorcery.jpg')
+            ]).then(([frame, frameUnit, brilliance, exotic, industry, sorcery]) => {
+              setCardFrame({ default: frame, unit: frameUnit });  // Store both frames
+              setInfluenceIcons({
+                brilliance,
+                exotic,
+                industry,
+                sorcery
+              });
+              setImagesLoaded(true);
+            }).catch(error => {
+              console.error('Error loading images:', error);
+              alert('Could not load images. Make sure the images folder contains: frame.jpg, frame-unit.jpg, brilliance.jpg, exotic.jpg, industry.jpg, and sorcery.jpg');
+            });
+          }, []);
+          
+          const handleImageUpload = (e, type) => {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                  if (type === 'art') {
+                    setCardArt(img);
+                    setArtPosition({ x: 0, y: 0, scale: 1 });
+                  }
+                };
+                img.src = event.target.result;
+              };
+              reader.readAsDataURL(file);
+            }
+          };
+          
+          const updateInfluenceCount = (influence, value) => {
+            const num = parseInt(value) || 0;
+            setInfluenceCounts(prev => ({
+              ...prev,
+              [influence]: Math.max(0, Math.min(9, num)) // Limit to 0-9
+            }));
+          };
+          
+          const handleMouseDown = (e) => {
+            if (!cardArt) return;
+            setIsDragging(true);
+            const rect = previewCanvasRef.current.getBoundingClientRect();
+            setDragStart({
+              x: e.clientX - rect.left - artPosition.x,
+              y: e.clientY - rect.top - artPosition.y
+            });
+          };
+          
+          const handleMouseMove = (e) => {
+            if (!isDragging || !cardArt) return;
+            const rect = previewCanvasRef.current.getBoundingClientRect();
+            setArtPosition(prev => ({
+              ...prev,
+              x: e.clientX - rect.left - dragStart.x,
+              y: e.clientY - rect.top - dragStart.y
+            }));
+          };
+          
+          const handleMouseUp = () => {
+            setIsDragging(false);
+          };
+          
+          const adjustZoom = (delta) => {
+            setArtPosition(prev => ({
+              ...prev,
+              scale: Math.max(0.1, Math.min(5, prev.scale + delta))
+            }));
+          };
+          
+          const wrapText = (ctx, text, maxWidth) => {
+            const paragraphs = text.split('\n'); // Split by line breaks first
+            const lines = [];
+  
+            paragraphs.forEach((paragraph, index) => {
+              if (paragraph.trim() === '') {
+                lines.push(''); // Preserve empty lines
+                return;
+              }
+    
+              const words = paragraph.split(' ');
+              let currentLine = words[0];
+    
+              for (let i = 1; i < words.length; i++) {
+                const word = words[i];
+                const width = ctx.measureText(currentLine + ' ' + word).width;
+                if (width < maxWidth) {
+                  currentLine += ' ' + word;
+                } else {
+                  lines.push(currentLine);
+                  currentLine = word;
+                }
+              }
+              lines.push(currentLine);
+            });
+  
+            return lines;
+          };
+          
+          const drawCard = (canvas, isExport = false) => {
+            const ctx = canvas.getContext('2d');
+            const scale = isExport ? 1 : canvas.width / CARD_WIDTH;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // STEP 1: Draw card art FIRST (so it appears under the frame)
+            if (cardArt) {
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(
+                ART_BOX.x * scale,
+                ART_BOX.y * scale,
+                ART_BOX.width * scale,
+                ART_BOX.height * scale
+              );
+              ctx.clip();
+              
+              const artScale = artPosition.scale * scale;
+              ctx.drawImage(
+                cardArt,
+                (ART_BOX.x + artPosition.x) * scale,
+                (ART_BOX.y + artPosition.y) * scale,
+                cardArt.width * artScale,
+                cardArt.height * artScale
+              );
+              ctx.restore();
+            }
+            
+            // STEP 2: Draw card frame on top of the art			
+			if (cardFrame) {
+              const frameToUse = cardData.cardType.toLowerCase() === 'unit' 
+                ? cardFrame.unit 
+                : cardFrame.default;
+              ctx.drawImage(frameToUse, 0, 0, canvas.width, canvas.height);
+            } else {
+              ctx.fillStyle = '#1a1a1a';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.strokeStyle = '#666';
+              ctx.lineWidth = 2 * scale;
+              ctx.strokeRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // Draw energy cost
+            ctx.font = FONTS.energy.replace(/(\d+)px/, (match, size) => `${parseInt(size) * scale}px`);
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+              cardData.energyCost,
+              ENERGY_POS.x * scale,
+              ENERGY_POS.y * scale
+            );
+            
+            // Draw card name with dynamic sizing
+            ctx.fillStyle = '#000000';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            
+            let nameFontSize = 32;
+            ctx.font = FONTS.name.replace(/(\d+)px/, `${nameFontSize * scale}px`);
+            while (ctx.measureText(cardData.cardName).width > NAME_BOX.width * scale && nameFontSize > 16) {
+              nameFontSize -= 1;
+              ctx.font = FONTS.name.replace(/(\d+)px/, `${nameFontSize * scale}px`);
+            }
+            
+            ctx.fillText(
+              cardData.cardName,
+              NAME_BOX.x * scale,
+              (NAME_BOX.y + NAME_BOX.height / 2) * scale
+            );
+            
+            // Draw card type
+            ctx.font = FONTS.type.replace(/(\d+)px/, (match, size) => `${parseInt(size) * scale}px`);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(
+              cardData.cardType,
+              (TYPE_BOX.x + 10) * scale,
+              (TYPE_BOX.y + TYPE_BOX.height / 2) * scale
+            );
+			
+			// Draw power/toughness for Units
+			if (cardData.cardType.toLowerCase() === 'unit' && (cardData.power || cardData.toughness)) {
+  			ctx.font = `bold ${36 * scale}px Arial`;
+ 			 ctx.fillStyle = '#ffffff';
+  			ctx.textAlign = 'center';
+			  ctx.fillText(
+ 			   `${cardData.power || '0'}/${cardData.toughness || '0'}`,
+			    680 * scale,  // Adjust X position for your frame
+			    900 * scale  // Adjust Y position for your frame
+ 			 );
+			}
+            
+            // Draw rules text with auto-scaling
+            let rulesFontSize = 60;
+            ctx.font = FONTS.rules.replace(/(\d+)px/, `${rulesFontSize * scale}px`);
+            let lines = wrapText(ctx, cardData.rulesText, RULES_BOX.width * scale);
+            
+            // Keep reducing font size until text fits
+            while (lines.length * rulesFontSize * 1.3 > RULES_BOX.height && rulesFontSize > 12) {
+              rulesFontSize -= 1;
+              ctx.font = FONTS.rules.replace(/(\d+)px/, `${rulesFontSize * scale}px`);
+              lines = wrapText(ctx, cardData.rulesText, RULES_BOX.width * scale);
+            }
+            
+            // Center the text vertically in the available space
+            const totalTextHeight = lines.length * rulesFontSize * 1.3;
+            const startY = RULES_BOX.y + (RULES_BOX.height - totalTextHeight) / 2;
+            
+            ctx.fillStyle = '#000000';
+            ctx.textAlign = 'center';
+            lines.forEach((line, i) => {
+              ctx.fillText(
+                line,
+                (RULES_BOX.x + 10) * scale,
+                (startY + 20 + i * rulesFontSize * 1.3) * scale
+              );
+            });
+            
+            // Draw influence icons with proper aspect ratio
+            let iconIndex = 0;
+            const influenceOrder = ['brilliance', 'exotic', 'industry', 'sorcery'];
+            
+            influenceOrder.forEach(influence => {
+              const count = influenceCounts[influence];
+              const icon = influenceIcons[influence];
+              
+              if (icon && count > 0) {
+                for (let i = 0; i < count; i++) {
+				  const row = Math.floor(iconIndex / 2);
+				  const col = iconIndex % 2;
+				  
+				  const xPos = (col == 0 ? ICON_START.x : ICON_START.x2) * scale;
+                  const yPos = (ICON_START.y + row * ICON_START.spacing) * scale;
+				  
+                  // Draw icon maintaining aspect ratio
+                  const iconWidth = ICON_START.width * scale;
+                  const iconHeight = ICON_START.height * scale;
+                  
+                  ctx.drawImage(
+                    icon,
+                    xPos,
+                    yPos,
+                    iconWidth,
+                    iconHeight
+                  );
+                  
+                  iconIndex++;
+                }
+              }
+            });
+          };
+          
+          useEffect(() => {
+            if (previewCanvasRef.current && imagesLoaded) {
+              drawCard(previewCanvasRef.current, false);
+            }
+          }, [cardData, cardFrame, cardArt, artPosition, influenceIcons, influenceCounts, imagesLoaded]);
+          
+          const exportCard = () => {
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = CARD_WIDTH;
+            exportCanvas.height = CARD_HEIGHT;
+            drawCard(exportCanvas, true);
+            
+            const link = document.createElement('a');
+            link.download = `${cardData.cardName.replace(/\s+/g, '_')}.png`;
+            link.href = exportCanvas.toDataURL('image/png');
+            link.click();
+          };
+          
+          const Upload = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          );
+          
+          const Download = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          );
+          
+          const ZoomIn = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+            </svg>
+          );
+          
+          const ZoomOut = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+            </svg>
+          );
+          
+          const Move = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          );
+          
+          if (!imagesLoaded) {
+            return (
+              <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-2xl mb-4">Loading images...</div>
+                  <div className="text-gray-400">Make sure your images folder contains all required files</div>
+                </div>
+              </div>
+            );
+          }
+          
+          return (
+            <div className="min-h-screen bg-gray-900 text-white p-8">
+              <div className="max-w-7xl mx-auto">
+                <h1 className="text-4xl font-bold mb-8 text-center">Card Generator</h1>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Panel - Inputs */}
+                  <div className="space-y-6">
+                    {/* Card Data Inputs */}
+                    <div className="bg-gray-800 p-6 rounded-lg space-y-4">
+                      <h2 className="text-xl font-bold mb-4">Card Data</h2>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Energy Cost</label>
+                        <input
+                          type="text"
+                          value={cardData.energyCost}
+                          onChange={(e) => setCardData({...cardData, energyCost: e.target.value})}
+                          className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                          maxLength="2"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Card Name</label>
+                        <input
+                          type="text"
+                          value={cardData.cardName}
+                          onChange={(e) => setCardData({...cardData, cardName: e.target.value})}
+                          className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Card Type</label>
+                        <input
+                          type="text"
+                          value={cardData.cardType}
+                          onChange={(e) => setCardData({...cardData, cardType: e.target.value})}
+                          className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Rules Text</label>
+                        <textarea
+                          value={cardData.rulesText}
+                          onChange={(e) => setCardData({...cardData, rulesText: e.target.value})}
+                          className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                          rows="4"
+                        />
+                      </div>
+                    </div>
+					
+					{cardData.cardType.toLowerCase() === 'unit' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Power</label>
+                          <input
+                            type="text"
+                            value={cardData.power || ''}
+                            onChange={(e) => setCardData({...cardData, power: e.target.value})}
+                            className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                            maxLength="2"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Toughness</label>
+                          <input
+                            type="text"
+                            value={cardData.toughness || ''}
+                            onChange={(e) => setCardData({...cardData, toughness: e.target.value})}
+                            className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                            maxLength="2"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Card Art Upload */}
+                    <div className="bg-gray-800 p-6 rounded-lg">
+                      <h2 className="text-xl font-bold mb-4">Card Art</h2>
+                      <label className="flex items-center justify-center w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded cursor-pointer transition mb-4">
+                        <Upload className="w-5 h-5 mr-2" />
+                        Upload Card Art
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, 'art')}
+                          className="hidden"
+                        />
+                      </label>
+                      
+                      {cardArt && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => adjustZoom(0.1)}
+                            className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition flex items-center justify-center"
+                          >
+                            <ZoomIn className="w-4 h-4 mr-1" /> Zoom In
+                          </button>
+                          <button
+                            onClick={() => adjustZoom(-0.1)}
+                            className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition flex items-center justify-center"
+                          >
+                            <ZoomOut className="w-4 h-4 mr-1" /> Zoom Out
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Influence Icons */}
+                    <div className="bg-gray-800 p-6 rounded-lg">
+                      <h2 className="text-xl font-bold mb-4">Influence Requirements</h2>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        {['brilliance', 'exotic', 'industry', 'sorcery'].map(influence => (
+                          <div key={influence}>
+                            <label className="block text-sm font-medium mb-1 capitalize">
+                              {influence}
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="9"
+                              value={influenceCounts[influence]}
+                              onChange={(e) => updateInfluenceCount(influence, e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right Panel - Preview */}
+                  <div className="space-y-6">
+                    <div className="bg-gray-800 p-6 rounded-lg">
+                      <h2 className="text-xl font-bold mb-4 flex items-center">
+                        <Move className="w-5 h-5 mr-2" />
+                        Card Preview (Drag to Position Art)
+                      </h2>
+                      <div className="flex justify-center">
+                        <canvas
+                          ref={previewCanvasRef}
+                          width={450}
+                          height={630}
+                          className="border-2 border-gray-600 rounded cursor-move"
+                          onMouseDown={handleMouseDown}
+                          onMouseMove={handleMouseMove}
+                          onMouseUp={handleMouseUp}
+                          onMouseLeave={handleMouseUp}
+                        />
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={exportCard}
+                      className="w-full px-6 py-4 bg-purple-600 hover:bg-purple-700 rounded font-bold text-lg transition flex items-center justify-center"
+                    >
+                      <Download className="w-6 h-6 mr-2" />
+                      Export Card as PNG
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        
+        ReactDOM.render(<CardGenerator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
