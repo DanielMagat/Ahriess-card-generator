@@ -67,7 +67,7 @@
           const ENERGY_BOX = { x: 80, y: 80, size: 70 };
           const NAME_BOX = { x: 144, y: 59, width: 515, height: 50 };
           const TYPE_BOX = { x: 373, y: 660, width: 620, height: 40 };
-          const	RULES_BOX = { x: 73, y: 710, width: 595, height: 270 };
+          const	RULES_BOX = { x: 73, y: 720, width: 593, height: 260 };
           const POWER_BOX = { x: 64, y: 1014, width: 100, height: 100 };
           const HEALTH_BOX = { x: 679, y: 1014, width: 100, height: 100 };
           
@@ -187,7 +187,7 @@
   
             paragraphs.forEach((paragraph, index) => {
               if (paragraph.trim() === '') {
-                lines.push(''); // Preserve empty lines
+                lines.push({ text: '', isLastInParagraph: true });
                 return;
               }
     
@@ -200,11 +200,11 @@
                 if (width < maxWidth) {
                   currentLine += ' ' + word;
                 } else {
-                  lines.push(currentLine);
+                  lines.push({ text: currentLine, isLastInParagraph: false });
                   currentLine = word;
                 }
               }
-              lines.push(currentLine);
+              lines.push({ text: currentLine, isLastInParagraph: true });
             });
   
             return lines;
@@ -460,25 +460,69 @@
             ctx.fillStyle = '#000000';
 			ctx.textAlign = 'left';
             
-            // Keep reducing font size until text fits
             let lines = wrapText(ctx, cardData.rulesText, RULES_BOX.width * scale);
-            while (lines.length * rulesFontSize * 1.3 > RULES_BOX.height && rulesFontSize > 12) {
-              rulesFontSize -= 1;
+
+            const MIN_RULES_FONT_SIZE = 10;
+            let lineHeightMultiplier = 1.3;
+            const MIN_LINE_HEIGHT_MULTIPLIER = 1.05;
+
+            // Step 1: shrink font size until it fits
+            while (lines.length * rulesFontSize * lineHeightMultiplier > RULES_BOX.height && rulesFontSize > MIN_RULES_FONT_SIZE) {
+			rulesFontSize -= 1;
               ctx.font = FONTS.rules.replace(/(\d+)px/, `${rulesFontSize * scale}px`);
               lines = wrapText(ctx, cardData.rulesText, RULES_BOX.width * scale);
             }
             
+            // Step 2: if still too tall at minimum font size, tighten line spacing
+            while (lines.length * rulesFontSize * lineHeightMultiplier > RULES_BOX.height && lineHeightMultiplier > MIN_LINE_HEIGHT_MULTIPLIER) {
+              lineHeightMultiplier -= 0.05;
+            }
+
+            const drawJustifiedLine = (ctx, line, x, y, maxWidth) => {
+              const words = line.split(' ');
+
+              if (words.length <= 1) {
+                ctx.fillText(line, x, y);
+                return;
+              }
+
+              const spaceWidth = ctx.measureText(' ').width;
+              const minGap = spaceWidth * 0.75; // don't let gaps shrink below 75% of a normal space
+
+              const wordsWidth = words.reduce((sum, word) => sum + ctx.measureText(word).width, 0);
+              const totalSpaceWidth = maxWidth - wordsWidth;
+              const gapWidth = totalSpaceWidth / (words.length - 1);
+
+              // If justifying would squish spaces too much, just draw normally instead
+              if (gapWidth < minGap) {
+                ctx.fillText(line, x, y);
+                return;
+              }
+
+              let currentX = x;
+              words.forEach((word) => {
+                ctx.fillText(word, currentX, y);
+                currentX += ctx.measureText(word).width + gapWidth;
+              });
+            };
+
             // Center the text vertically in the available space
-            const totalTextHeight = lines.length * rulesFontSize * 1.3;
-            const startY = RULES_BOX.y + (RULES_BOX.height - totalTextHeight) / 2;
-            
+            const totalTextHeight = lines.length * rulesFontSize * lineHeightMultiplier;
+            const startY = RULES_BOX.y + Math.max(0, (RULES_BOX.height - totalTextHeight) / 2);
 			
-            lines.forEach((line, i) => {
-              ctx.fillText(
-                line,
-                (RULES_BOX.x + 10) * scale,
-                (startY + 20 + i * rulesFontSize * 1.3) * scale
-              );
+			ctx.textAlign = 'left'; // justify requires left alignment as the base
+			lines.forEach((line, i) => {
+              const yPos = (startY + 20 + i * rulesFontSize * 1.3) * scale;
+              const xPos = (RULES_BOX.x + 10) * scale;
+              const maxLineWidth = RULES_BOX.width * scale - 20; // subtract padding
+  
+            if (line.isLastInParagraph || line.text === '') {
+              // Last line of paragraph: normal left-aligned, not stretched
+              ctx.fillText(line.text, xPos, yPos);
+            } else {
+              // Wrapped line: justify to fill the width
+              drawJustifiedLine(ctx, line.text, xPos, yPos, maxLineWidth);
+              }
             });
             
             // Draw influence icons with proper aspect ratio
