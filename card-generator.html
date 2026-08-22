@@ -4,22 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Card Generator</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.2/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
     <div id="root"></div>
     
     <script type="text/babel">
+        // Load Google Fonts
+        const loadGoogleFont = (fontFamily) => {
+          const link = document.createElement('link');
+          link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;600;700&display=swap`;
+          link.rel = 'stylesheet';
+          document.head.appendChild(link);
+        };
+
+        loadGoogleFont('Lato');
+		
         const { useState, useRef, useEffect } = React;
         
         function CardGenerator() {
           const [cardData, setCardData] = useState({
-            energyCost: '5',
+            energy: '5',
             cardName: 'Example Card',
-            cardType: 'Spell',
+            cardType: 'Unit',
             rulesText: 'This is an example of rules text that will automatically scale to fit the text box.'
           });
           
@@ -31,7 +41,7 @@
           
           const [influenceIcons, setInfluenceIcons] = useState({
             brilliance: null,
-            exotic: null,
+            exomatter: null,
             industry: null,
             sorcery: null
           });
@@ -39,7 +49,7 @@
           // Changed to store counts instead of boolean selection
           const [influenceCounts, setInfluenceCounts] = useState({
             brilliance: 0,
-            exotic: 0,
+            exomatter: 0,
             industry: 0,
             sorcery: 0
           });
@@ -53,17 +63,19 @@
           const CARD_HEIGHT = 1050;
           
           // Adjust these coordinates to match your card frame perfectly
-          const ART_BOX = { x: 55, y: 160, width: 640, height: 480 };
-          const ENERGY_POS = { x: 130, y: 125, size: 70 };
-          const NAME_BOX = { x: 220, y: 95, width: 520, height: 50 };
-          const TYPE_BOX = { x: 342, y: 600, width: 620, height: 40 };
-          const RULES_BOX = { x: 365, y: 670, width: 555, height: 230 };
+          const ART_BOX = { x: 47, y: 110, width: 640, height: 570 };
+          const ENERGY_BOX = { x: 80, y: 80, size: 70 };
+          const NAME_BOX = { x: 144, y: 59, width: 515, height: 50 };
+          const TYPE_BOX = { x: 373, y: 660, width: 620, height: 40 };
+          const	RULES_BOX = { x: 73, y: 710, width: 595, height: 270 };
+          const POWER_BOX = { x: 64, y: 1014, width: 100, height: 100 };
+          const HEALTH_BOX = { x: 679, y: 1014, width: 100, height: 100 };
           
           // Icon configuration
           const ICON_START = { 
-            x: 60,           // X position
-			x2: 135,
-            y: 200,          // Starting Y position
+            x: 10,           // X position
+            x2: 85,
+            y: 170,          // Starting Y position
             width: 75,       // Width to render icons at
             height: 100,      // Height to render icons at (adjust for your icon proportions)
             spacing: 100      // Space between icons
@@ -71,10 +83,11 @@
           
           // FONT CONFIGURATION - Change these to use different fonts
           const FONTS = {
-            energy: 'bold 60px Arial',           // Energy cost font
-            name: 'bold 32px Arial',           // Card name font
-            type: '24px Arial',                  // Card type font
-            rules: '22px "Plantin"'      // Rules text font
+            energy: 'bold 80px "Lato"',
+            name: '60px "Times New Roman"',
+            type: '54px "Times New Roman"',
+            rules: '46px "Times New Roman"',
+            power: 'bold 80px "Lato"'
           };
           
           // Load images on mount
@@ -90,23 +103,24 @@
     
             Promise.all([
               loadImage('images/frame.png'),
-              loadImage('images/frame-unit.png'),  // Add unit frame
+              loadImage('images/frame-unit.png'),
+              loadImage('images/frame-overlay.png'),
               loadImage('images/Brilliance.jpg'),
-              loadImage('images/Exotic.jpg'),
+              loadImage('images/Exomatter.jpg'),
               loadImage('images/Industry.jpg'),
               loadImage('images/Sorcery.jpg')
-            ]).then(([frame, frameUnit, brilliance, exotic, industry, sorcery]) => {
-              setCardFrame({ default: frame, unit: frameUnit });  // Store both frames
+            ]).then(([frame, frameUnit, frameOverlay, brilliance, exomatter, industry, sorcery]) => {
+              setCardFrame({ default: frame, unit: frameUnit, overlay: frameOverlay });  // Store both frames
               setInfluenceIcons({
                 brilliance,
-                exotic,
+                exomatter,
                 industry,
                 sorcery
               });
               setImagesLoaded(true);
             }).catch(error => {
               console.error('Error loading images:', error);
-              alert('Could not load images. Make sure the images folder contains: frame.jpg, frame-unit.jpg, brilliance.jpg, exotic.jpg, industry.jpg, and sorcery.jpg');
+              alert('Could not load images. Make sure the images folder contains: frame.jpg, frame-unit.jpg, frame-overlay, Brilliance.jpg, Exomatter.jpg, Industry.jpg, and Sorcery.jpg');
             });
           }, []);
           
@@ -168,7 +182,7 @@
           };
           
           const wrapText = (ctx, text, maxWidth) => {
-            const paragraphs = text.split('\n'); // Split by line breaks first
+            const paragraphs = text.split('\n');
             const lines = [];
   
             paragraphs.forEach((paragraph, index) => {
@@ -241,60 +255,213 @@
             
             // Draw energy cost
             ctx.font = FONTS.energy.replace(/(\d+)px/, (match, size) => `${parseInt(size) * scale}px`);
-            ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(
-              cardData.energyCost,
-              ENERGY_POS.x * scale,
-              ENERGY_POS.y * scale
+			
+			
+			//Lato digit offset fix
+			if (FONTS.energy.includes('"Lato"')) {
+				if (cardData.energy === '1' || cardData.energy === '4'){
+					ENERGY_BOX.x -= 2;
+				}
+				if (cardData.energy === '2' || cardData.energy === '8'){
+					ENERGY_BOX.x += 1;
+				}
+				if (cardData.energy === '7' || cardData.energy === '5'){
+					ENERGY_BOX.x += 2;
+				}
+				if (cardData.energy === '1' || cardData.energy === '2'){
+					ENERGY_BOX.y -= 1;
+				}
+			}
+
+            ctx.fillStyle = '#ffffff';
+
+            //Chatgpt silver gradient
+            let gradient = ctx.createLinearGradient(
+              (ENERGY_BOX.x) * scale,
+              (ENERGY_BOX.y - 30) * scale,
+              (ENERGY_BOX.x) * scale,
+              (ENERGY_BOX.y + 60) * scale
             );
+
+            gradient.addColorStop(0.00, "#f6f3ee");
+            gradient.addColorStop(0.50, "#8f939a");
+            gradient.addColorStop(1.00, "#494c50");
+
+            // Shadow
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillText(cardData.energy, (ENERGY_BOX.x * scale)+2, (ENERGY_BOX.y * scale)+2);
+
+            // Dark outline
+            ctx.lineWidth = 7 * scale;
+            ctx.strokeStyle = "#2b2e34";
+            ctx.strokeText(cardData.energy, ENERGY_BOX.x * scale, (ENERGY_BOX.y * scale)+1);
+
+            // Main metallic fill
+            ctx.fillStyle = gradient;
+            ctx.fillText(cardData.energy, ENERGY_BOX.x * scale, ENERGY_BOX.y * scale);
+			
+            //Top highlight
+            ctx.fillStyle = "rgba(255,255,255,0.28)";
+            ctx.fillText(cardData.energy, ENERGY_BOX.x * scale, (ENERGY_BOX.y * scale)-1);
+            //end Chatgpt gradient
             
             // Draw card name with dynamic sizing
-            ctx.fillStyle = '#000000';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            
-            let nameFontSize = 32;
+            const nameFontMatch = FONTS.name.match(/(\d+)px/);
+            let nameFontSize = nameFontMatch ? parseInt(nameFontMatch[1]) : 50;
             ctx.font = FONTS.name.replace(/(\d+)px/, `${nameFontSize * scale}px`);
             while (ctx.measureText(cardData.cardName).width > NAME_BOX.width * scale && nameFontSize > 16) {
               nameFontSize -= 1;
               ctx.font = FONTS.name.replace(/(\d+)px/, `${nameFontSize * scale}px`);
             }
+			
+            ctx.fillStyle = '#000000';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
             
-            ctx.fillText(
-              cardData.cardName,
+			//Chatgpt silver gradient
+            gradient = ctx.createLinearGradient(
               NAME_BOX.x * scale,
-              (NAME_BOX.y + NAME_BOX.height / 2) * scale
+              (NAME_BOX.y - 10) * scale,
+              NAME_BOX.x * scale,
+              (NAME_BOX.y + NAME_BOX.height) * scale
             );
+			
+            gradient.addColorStop(0.00, "#f6f3ee");
+            gradient.addColorStop(0.50, "#8f939a");
+            gradient.addColorStop(1.00, "#494c50");
+
+            //Shadow
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillText(cardData.cardName, (NAME_BOX.x * scale)+2, (NAME_BOX.y * scale)+2);
+
+            //Dark outline
+            ctx.lineWidth = 5 * scale;
+            ctx.strokeStyle = "#2b2e34";
+            ctx.strokeText(cardData.cardName, (NAME_BOX.x * scale), (NAME_BOX.y * scale)+1);
+
+            //Main metallic fill
+            ctx.fillStyle = gradient;
+            ctx.fillText(cardData.cardName, NAME_BOX.x * scale, NAME_BOX.y * scale);
+
+            //Top highlight
+            ctx.fillStyle = "rgba(255,255,255,0.28)";
+            ctx.fillText(cardData.cardName, NAME_BOX.x * scale, (NAME_BOX.y * scale)-1);
+            //end Chatgpt gradient
             
             // Draw card type
             ctx.font = FONTS.type.replace(/(\d+)px/, (match, size) => `${parseInt(size) * scale}px`);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(
-              cardData.cardType,
-              (TYPE_BOX.x + 10) * scale,
-              (TYPE_BOX.y + TYPE_BOX.height / 2) * scale
+            ctx.textAlign = 'center';
+			
+			//Chatgpt silver gradient
+            gradient = ctx.createLinearGradient(
+              TYPE_BOX.x * scale,
+              (TYPE_BOX.y) * scale,
+              TYPE_BOX.x * scale,
+              (TYPE_BOX.y + TYPE_BOX.height) * scale
             );
 			
-			// Draw power/toughness for Units
-			if (cardData.cardType.toLowerCase() === 'unit' && (cardData.power || cardData.toughness)) {
-  			ctx.font = `bold ${36 * scale}px Arial`;
- 			 ctx.fillStyle = '#ffffff';
-  			ctx.textAlign = 'center';
-			  ctx.fillText(
- 			   `${cardData.power || '0'}/${cardData.toughness || '0'}`,
-			    680 * scale,  // Adjust X position for your frame
-			    900 * scale  // Adjust Y position for your frame
- 			 );
+            gradient.addColorStop(0.00, "#f6f3ee");
+            gradient.addColorStop(0.50, "#8f939a");
+            gradient.addColorStop(1.00, "#494c50");
+
+            //Shadow
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillText(cardData.cardType, (TYPE_BOX.x * scale)+2, (TYPE_BOX.y * scale)+2);
+
+            //Dark outline
+            ctx.lineWidth = 4 * scale;
+            ctx.strokeStyle = "#2b2e34";
+            ctx.strokeText(cardData.cardType, (TYPE_BOX.x * scale), (TYPE_BOX.y * scale)+1);
+
+            //Main metallic fill
+            ctx.fillStyle = gradient;
+            ctx.fillText(cardData.cardType, TYPE_BOX.x * scale, TYPE_BOX.y * scale);
+
+            //Top highlight
+            ctx.fillStyle = "rgba(255,255,255,0.28)";
+            ctx.fillText(cardData.cardType, TYPE_BOX.x * scale, (TYPE_BOX.y * scale)-1);
+            //end Chatgpt gradient 
+			
+			// Draw power/health for Units
+			if (cardData.cardType.toLowerCase() === 'unit' && (cardData.power || cardData.health)) {
+				ctx.font = FONTS.power.replace(/(\d+)px/, (match, size) => `${parseInt(size) * scale}px`);
+				ctx.textAlign = 'center';
+				
+				//Lato digit offset fix
+				if (FONTS.power.includes('"Lato"')) {
+					if (cardData.power === '1' || cardData.power === '4'){
+						POWER_BOX.x -= 2;
+					}
+					if (cardData.power === '2' || cardData.power === '8'){
+						POWER_BOX.x += 1;
+					}
+					if (cardData.power === '7' || cardData.power === '5'){
+						POWER_BOX.x += 2;
+					}
+					if (cardData.power === '1' || cardData.power === '2'){
+						POWER_BOX.y -= 1;
+					}
+					if (cardData.health === '1' || cardData.health === '4'){
+						HEALTH_BOX.x -= 2;
+					}
+					if (cardData.health === '2' || cardData.health === '8'){
+						HEALTH_BOX.x += 1;
+					}
+					if (cardData.health === '7' || cardData.health === '5'){
+						HEALTH_BOX.x += 2;
+					}
+					if (cardData.health === '1' || cardData.health === '2'){
+						HEALTH_BOX.y -= 1;
+					}
+				}
+				
+				//Chatgpt silver gradient
+            	gradient = ctx.createLinearGradient(
+              		POWER_BOX.x * scale,
+              		(POWER_BOX.y - 10) * scale,
+              		POWER_BOX.x * scale,
+              		(POWER_BOX.y + POWER_BOX.height) * scale
+            	);
+			
+            	gradient.addColorStop(0.00, "#f6f3ee");
+            	gradient.addColorStop(0.50, "#8f939a");
+            	gradient.addColorStop(1.00, "#494c50");
+
+            	//Shadow
+            	ctx.fillStyle = "rgba(0,0,0,0.35)";
+            	ctx.fillText(cardData.power, (POWER_BOX.x * scale)+2, (POWER_BOX.y * scale)+2);
+            	ctx.fillText(cardData.health, (HEALTH_BOX.x * scale)+2, (HEALTH_BOX.y * scale)+2);
+
+            	//Dark outline
+            	ctx.lineWidth = 7 * scale;
+            	ctx.strokeStyle = "#2b2e34";
+            	ctx.strokeText(cardData.power, (POWER_BOX.x * scale), (POWER_BOX.y * scale)+1);
+            	ctx.strokeText(cardData.health, (HEALTH_BOX.x * scale), (HEALTH_BOX.y * scale)+1);
+
+            	//Main metallic fill
+            	ctx.fillStyle = gradient;
+            	ctx.fillText(cardData.power, POWER_BOX.x * scale, POWER_BOX.y * scale);
+				ctx.fillText(cardData.health, HEALTH_BOX.x * scale, HEALTH_BOX.y * scale);
+
+            	//Top highlight
+            	//ctx.fillStyle = "rgba(255,255,255,0.28)";
+            	//ctx.fillText(cardData.power, POWER_BOX.x * scale, (POWER_BOX.y * scale)-1);
+            	//ctx.fillText(cardData.health, HEALTH_BOX.x * scale, (HEALTH_BOX.y * scale)-1);
+            	//end Chatgpt gradient
 			}
             
             // Draw rules text with auto-scaling
-            let rulesFontSize = 60;
+            const rulesFontMatch = FONTS.rules.match(/(\d+)px/);
+			let rulesFontSize = rulesFontMatch ? parseInt(rulesFontMatch[1]) : 22;
             ctx.font = FONTS.rules.replace(/(\d+)px/, `${rulesFontSize * scale}px`);
-            let lines = wrapText(ctx, cardData.rulesText, RULES_BOX.width * scale);
+			
+            ctx.fillStyle = '#000000';
+			ctx.textAlign = 'left';
             
             // Keep reducing font size until text fits
+            let lines = wrapText(ctx, cardData.rulesText, RULES_BOX.width * scale);
             while (lines.length * rulesFontSize * 1.3 > RULES_BOX.height && rulesFontSize > 12) {
               rulesFontSize -= 1;
               ctx.font = FONTS.rules.replace(/(\d+)px/, `${rulesFontSize * scale}px`);
@@ -305,8 +472,7 @@
             const totalTextHeight = lines.length * rulesFontSize * 1.3;
             const startY = RULES_BOX.y + (RULES_BOX.height - totalTextHeight) / 2;
             
-            ctx.fillStyle = '#000000';
-            ctx.textAlign = 'center';
+			
             lines.forEach((line, i) => {
               ctx.fillText(
                 line,
@@ -317,7 +483,7 @@
             
             // Draw influence icons with proper aspect ratio
             let iconIndex = 0;
-            const influenceOrder = ['brilliance', 'exotic', 'industry', 'sorcery'];
+            const influenceOrder = ['brilliance', 'exomatter', 'industry', 'sorcery'];
             
             influenceOrder.forEach(influence => {
               const count = influenceCounts[influence];
@@ -347,6 +513,7 @@
                 }
               }
             });
+			ctx.drawImage(cardFrame.overlay, 0, 0, canvas.width, canvas.height);
           };
           
           useEffect(() => {
@@ -356,15 +523,36 @@
           }, [cardData, cardFrame, cardArt, artPosition, influenceIcons, influenceCounts, imagesLoaded]);
           
           const exportCard = () => {
-            const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = CARD_WIDTH;
-            exportCanvas.height = CARD_HEIGHT;
-            drawCard(exportCanvas, true);
-            
-            const link = document.createElement('a');
-            link.download = `${cardData.cardName.replace(/\s+/g, '_')}.png`;
-            link.href = exportCanvas.toDataURL('image/png');
-            link.click();
+            try {
+              const exportCanvas = document.createElement('canvas');
+              exportCanvas.width = CARD_WIDTH;
+              exportCanvas.height = CARD_HEIGHT;
+              drawCard(exportCanvas, true);
+    
+              // Convert to blob for more reliable download
+              exportCanvas.toBlob((blob) => {
+                if (!blob) {
+                  alert('Failed to generate image. Please try again.');
+                  return;
+                }
+      
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `${cardData.cardName.replace(/\s+/g, '_')}.png`;
+                link.href = url;
+      
+                // Append to body, click, then remove
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+      
+                // Clean up the URL object
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+              }, 'image/png');
+            } catch (error) {
+              console.error('Export error:', error);
+              alert('Error exporting card: ' + error.message);
+            }
           };
           
           const Upload = ({ className }) => (
@@ -424,8 +612,8 @@
                         <label className="block text-sm font-medium mb-2">Energy Cost</label>
                         <input
                           type="text"
-                          value={cardData.energyCost}
-                          onChange={(e) => setCardData({...cardData, energyCost: e.target.value})}
+                          value={cardData.energy}
+                          onChange={(e) => setCardData({...cardData, energy: e.target.value})}
                           className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
                           maxLength="2"
                         />
@@ -475,11 +663,11 @@
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-2">Toughness</label>
+                          <label className="block text-sm font-medium mb-2">Health</label>
                           <input
                             type="text"
-                            value={cardData.toughness || ''}
-                            onChange={(e) => setCardData({...cardData, toughness: e.target.value})}
+                            value={cardData.health || ''}
+                            onChange={(e) => setCardData({...cardData, health: e.target.value})}
                             className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
                             maxLength="2"
                           />
@@ -524,7 +712,7 @@
                       <h2 className="text-xl font-bold mb-4">Influence Requirements</h2>
                       
                       <div className="grid grid-cols-2 gap-3">
-                        {['brilliance', 'exotic', 'industry', 'sorcery'].map(influence => (
+                        {['brilliance', 'exomatter', 'industry', 'sorcery'].map(influence => (
                           <div key={influence}>
                             <label className="block text-sm font-medium mb-1 capitalize">
                               {influence}
@@ -554,7 +742,7 @@
                         <canvas
                           ref={previewCanvasRef}
                           width={450}
-                          height={630}
+                          height={643}
                           className="border-2 border-gray-600 rounded cursor-move"
                           onMouseDown={handleMouseDown}
                           onMouseMove={handleMouseMove}
