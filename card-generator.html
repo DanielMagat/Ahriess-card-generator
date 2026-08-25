@@ -65,7 +65,7 @@
           // Adjust these coordinates to match your card frame perfectly
           const ART_BOX = { x: 47, y: 110, width: 640, height: 570 };
           const ENERGY_BOX = { x: 80, y: 80, size: 70 };
-          const NAME_BOX = { x: 144, y: 59, width: 515, height: 50 };
+          const NAME_BOX = { x: 144, y: 61, width: 507, height: 50 };
           const TYPE_BOX = { x: 373, y: 660, width: 620, height: 40 };
           const	RULES_BOX = { x: 73, y: 720, width: 593, height: 260 };
           const POWER_BOX = { x: 64, y: 1014, width: 100, height: 100 };
@@ -74,20 +74,20 @@
           // Icon configuration
           const ICON_START = { 
             x: 10,           // X position
-            x2: 85,
-            y: 170,          // Starting Y position
-            width: 75,       // Width to render icons at
-            height: 100,      // Height to render icons at (adjust for your icon proportions)
-            spacing: 100      // Space between icons
+            x2: 90,
+            y: 150,          // Starting Y position
+            width: 90,       // Width to render icons at
+            height: 90,      // Height to render icons at (adjust for your icon proportions)
+            spacing: 90      // Space between icons
           };
           
           // FONT CONFIGURATION - Change these to use different fonts
           const FONTS = {
-            energy: 'bold 80px "Lato"',
+            energy: 'bold 76px "Lato"',
             name: '60px "Times New Roman"',
             type: '54px "Times New Roman"',
             rules: '46px "Times New Roman"',
-            power: 'bold 80px "Lato"'
+            power: 'bold 76px "Lato"'
           };
           
           // Load images on mount
@@ -105,10 +105,10 @@
               loadImage('images/frame.png'),
               loadImage('images/frame-unit.png'),
               loadImage('images/frame-overlay.png'),
-              loadImage('images/Brilliance.jpg'),
-              loadImage('images/Exomatter.jpg'),
-              loadImage('images/Industry.jpg'),
-              loadImage('images/Sorcery.jpg')
+              loadImage('images/Brilliance.png'),
+              loadImage('images/Exomatter.png'),
+              loadImage('images/Industry.png'),
+              loadImage('images/Sorcery.png')
             ]).then(([frame, frameUnit, frameOverlay, brilliance, exomatter, industry, sorcery]) => {
               setCardFrame({ default: frame, unit: frameUnit, overlay: frameOverlay });  // Store both frames
               setInfluenceIcons({
@@ -212,6 +212,8 @@
           
           const drawCard = (canvas, isExport = false) => {
             const ctx = canvas.getContext('2d');
+			//ctx.imageSmoothingEnabled = true;
+ 			//ctx.imageSmoothingQuality = 'high'; //didn't notice a different with these
             const scale = isExport ? 1 : canvas.width / CARD_WIDTH;
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -229,7 +231,8 @@
               ctx.clip();
               
               const artScale = artPosition.scale * scale;
-              ctx.drawImage(
+              drawImageSupersampled(
+			    ctx,
                 cardArt,
                 (ART_BOX.x + artPosition.x) * scale,
                 (ART_BOX.y + artPosition.y) * scale,
@@ -244,7 +247,7 @@
               const frameToUse = cardData.cardType.toLowerCase() === 'unit' 
                 ? cardFrame.unit 
                 : cardFrame.default;
-              ctx.drawImage(frameToUse, 0, 0, canvas.width, canvas.height);
+              drawImageSupersampled(ctx, frameToUse, 0, 0, canvas.width, canvas.height);
             } else {
               ctx.fillStyle = '#1a1a1a';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -535,8 +538,13 @@
               
               if (icon && count > 0) {
                 for (let i = 0; i < count; i++) {
-				  const row = Math.floor(iconIndex / 2);
-				  const col = iconIndex % 2;
+				  //double spaced icons
+				  //const row = Math.floor(iconIndex / 2);
+				  //const col = iconIndex % 2;
+				  
+				  //single spaced icons
+				  const row = iconIndex;
+				  const col = 0;
 				  
 				  const xPos = (col == 0 ? ICON_START.x : ICON_START.x2) * scale;
                   const yPos = (ICON_START.y + row * ICON_START.spacing) * scale;
@@ -545,7 +553,8 @@
                   const iconWidth = ICON_START.width * scale;
                   const iconHeight = ICON_START.height * scale;
                   
-                  ctx.drawImage(
+                  drawImageSupersampled(
+			        ctx,
                     icon,
                     xPos,
                     yPos,
@@ -559,6 +568,33 @@
             });
 			ctx.drawImage(cardFrame.overlay, 0, 0, canvas.width, canvas.height);
           };
+		  
+		  const drawImageSupersampled = (ctx, img, dx, dy, dWidth, dHeight) => {
+ 		   let srcCanvas = img;
+ 		   let srcWidth = img.width;
+ 		   let srcHeight = img.height;
+  
+ 		   // Keep halving the size until we're close to the target size
+ 		   while (srcWidth > dWidth * 2 && srcHeight > dHeight * 2) {
+  		    const stepCanvas = document.createElement('canvas');
+   		   const newWidth = Math.max(Math.floor(srcWidth / 2), dWidth);
+  		    const newHeight = Math.max(Math.floor(srcHeight / 2), dHeight);
+  		    stepCanvas.width = newWidth;
+  		    stepCanvas.height = newHeight;
+    
+   		   const stepCtx = stepCanvas.getContext('2d');
+   		   stepCtx.imageSmoothingEnabled = true;
+   		   stepCtx.imageSmoothingQuality = 'high';
+  		    stepCtx.drawImage(srcCanvas, 0, 0, srcWidth, srcHeight, 0, 0, newWidth, newHeight);
+    
+  		    srcCanvas = stepCanvas;
+  		    srcWidth = newWidth;
+  		    srcHeight = newHeight;
+ 		   }
+  
+ 		   // Final draw at the exact target size
+ 		   ctx.drawImage(srcCanvas, 0, 0, srcWidth, srcHeight, dx, dy, dWidth, dHeight);
+		  };
           
           useEffect(() => {
             if (previewCanvasRef.current && imagesLoaded) {
