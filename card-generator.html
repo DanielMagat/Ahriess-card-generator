@@ -62,7 +62,6 @@
           const CARD_WIDTH = 750;
           const CARD_HEIGHT = 1050;
           
-          // Adjust these coordinates to match your card frame perfectly
           const ART_BOX = { x: 47, y: 110, width: 640, height: 570 };
           const ENERGY_BOX = { x: 80, y: 80, size: 70 };
           const NAME_BOX = { x: 144, y: 61, width: 507, height: 50 };
@@ -73,12 +72,8 @@
           
           // Icon configuration
           const ICON_START = { 
-            x: 10,           // X position
-            x2: 90,
-            y: 150,          // Starting Y position
-            width: 90,       // Width to render icons at
-            height: 90,      // Height to render icons at (adjust for your icon proportions)
-            spacing: 90      // Space between icons
+            x: 10, x2: 90, y: 150,
+            width: 90, height: 90, spacing: 90
           };
           
           // FONT CONFIGURATION - Change these to use different fonts
@@ -108,15 +103,10 @@
               loadImage('images/Brilliance.png'),
               loadImage('images/Exomatter.png'),
               loadImage('images/Industry.png'),
-              loadImage('images/Sorcery.png')
+              loadImage('images/Sorcery.png'),
             ]).then(([frame, frameUnit, frameOverlay, brilliance, exomatter, industry, sorcery]) => {
               setCardFrame({ default: frame, unit: frameUnit, overlay: frameOverlay });  // Store both frames
-              setInfluenceIcons({
-                brilliance,
-                exomatter,
-                industry,
-                sorcery
-              });
+              setInfluenceIcons({ brilliance, exomatter, industry, sorcery});
               setImagesLoaded(true);
             }).catch(error => {
               console.error('Error loading images:', error);
@@ -261,6 +251,10 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 			
+			
+			if (cardData.cardType.toLowerCase() === 'trap'){
+				cardData.energy = 'T';
+			}
 			
 			//Lato digit offset fix
 			if (FONTS.energy.includes('"Lato"')) {
@@ -531,7 +525,7 @@
             // Draw influence icons with proper aspect ratio
             let iconIndex = 0;
             const influenceOrder = ['brilliance', 'exomatter', 'industry', 'sorcery'];
-            
+			
             influenceOrder.forEach(influence => {
               const count = influenceCounts[influence];
               const icon = influenceIcons[influence];
